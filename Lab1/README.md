@@ -1,8 +1,8 @@
 # Practica 1
 
 El objetivo es mejorar el SAT-solver en:
- * [] unit_propagation (propagateGivesConflict) usando ocurrList
- * [] heuristica de decision (getNextDecisionLiteral)
+ * [ ] unit_propagation (propagateGivesConflict) usando ocurrList
+ * [ ] heuristica de decision (getNextDecisionLiteral)
 
 Hints:
  * Mejorar la heuristica a la hora de DECIDIR.
