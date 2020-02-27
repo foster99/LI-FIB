@@ -1,0 +1,100 @@
+
+------------------
+random3SAT/vars-150-10.cnf
+picoSAT:
+UNSATISFIABLE
+c 3145 decisions
+0 s
+misat:
+UNSATISFIABLE
+14 s
+
+------------------
+random3SAT/vars-150-1.cnf
+picoSAT:
+SATISFIABLE
+c 893 decisions
+0 s
+misat:
+SATISFIABLE
+3 s
+
+------------------
+random3SAT/vars-150-2.cnf
+picoSAT:
+SATISFIABLE
+c 3190 decisions
+0 s
+misat:
+SATISFIABLE
+12 s
+
+------------------
+random3SAT/vars-150-3.cnf
+picoSAT:
+SATISFIABLE
+c 1563 decisions
+0 s
+misat:
+SATISFIABLE
+8 s
+
+------------------
+random3SAT/vars-150-4.cnf
+picoSAT:
+SATISFIABLE
+c 1646 decisions
+0 s
+misat:
+SATISFIABLE
+6 s
+
+------------------
+random3SAT/vars-150-5.cnf
+picoSAT:
+UNSATISFIABLE
+c 3002 decisions
+0 s
+misat:
+UNSATISFIABLE
+5 s
+
+------------------
+random3SAT/vars-150-6.cnf
+picoSAT:
+SATISFIABLE
+c 270 decisions
+0 s
+misat:
+SATISFIABLE
+0 s
+
+------------------
+random3SAT/vars-150-7.cnf
+picoSAT:
+UNSATISFIABLE
+c 2445 decisions
+0 s
+misat:
+UNSATISFIABLE
+13 s
+
+------------------
+random3SAT/vars-150-8.cnf
+picoSAT:
+SATISFIABLE
+c 821 decisions
+0 s
+misat:
+SATISFIABLE
+3 s
+
+------------------
+random3SAT/vars-150-9.cnf
+picoSAT:
+SATISFIABLE
+c 1263 decisions
+0 s
+misat:
+SATISFIABLE
+4 s
