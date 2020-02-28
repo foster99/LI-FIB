@@ -17,16 +17,26 @@ vector<int> modelStack;
 uint indexOfNextLitToPropagate;
 uint decisionLevel;
 
+// Lista Ocurrencia
 vector< vector<int> > pos_ocurr;
 vector< vector<int> > neg_ocurr;
 
-multimap<double, int> usageRatio;    // map< %usage, literalIndex >
+// Heurisitco
+vector<double> usageCounter;
+uint conflictCount = 0;
 
+    ////////// VALORES A MODIFICAR PARA TUNEAR EL HEURISTICO //////////
+    const uint NUM_DEC      = 50;
+    const double PRIZE      = 500.0;
+    const double DIVISOR    = 10.0;
+    ///////////////////////////////////////////////////////////////////
+
+// Medicion
 double elapsed_time;
-int decisionsCount = 0;
-int propagationsCount = 0;
+uint decisionsCount = 0;
+uint propagationsCount = 0;
 
-void readClauses( ){
+void readClauses( ) {
 	// Skip comments
 	char c = cin.get();
 	while (c == 'c') {
@@ -54,9 +64,26 @@ void readClauses( ){
 		}
 	}
 	
+	/* -------------------------------------------------------------------*/
+	usageCounter.resize(numVars + 1);
 	for (uint lit = 1; lit < numVars + 1; ++lit)
-		usageRatio.insert(make_pair(double(pos_ocurr[lit].size() + neg_ocurr[lit].size()), lit));
+        usageCounter[lit] = 0;
+		//usageCounter[lit] = pos_ocurr[lit].size() + neg_ocurr[lit].size();
+    /* -------------------------------------------------------------------*/
+}
 
+void changeCounter(int clauseId) {
+    
+    ++conflictCount;
+    if (conflictCount > NUM_DEC) {
+        conflictCount = 0;
+        for (auto& counter : usageCounter)
+            counter /= DIVISOR;
+    }
+    
+    for (const auto lit : clauses[clauseId])
+        usageCounter[abs(lit)] += PRIZE;
+        
 }
 
 int currentValueInModel(int lit){
@@ -101,8 +128,8 @@ bool propagateGivesConflict ( ) {
 				else if (val == UNDEF){ ++numUndefs; lastLitUndef = clauses[clause][k]; }
 			}
 			
-			if (not someLitTrue and numUndefs == 0){
-				++usageRatio
+			if (not someLitTrue and numUndefs == 0) {
+                changeCounter(clause);
                 return true;                            // CONFLICTO!! (contradiccion)
 			}
                 
@@ -134,19 +161,18 @@ void backtrack() {
 // Heuristic for finding the next decision literal:
 int getNextDecisionLiteral() {
     
-    for (const auto entry : usageRatio)  {
-		int lit = entry.second;
-		if (model[lit] == UNDEF) {
-			decisionsCount++;
-			return lit;			// returns first UNDEF var, positively
-		}  	
+    double aux, max = -1;
+    int lit = 0;
+    
+    for (uint i = 1; i < usageCounter.size(); ++i)  {
+		if (model[i] == UNDEF && (aux = usageCounter[i]) > max) {
+            lit = i;
+            max = aux;
+		}
 	}
 	
-	/*for (uint i = 1; i <= numVars; ++i) {	// stupid heuristic:
-		if (model[i] == UNDEF) return i;  	// returns first UNDEF var, positively
-	}*/
-
-	return 0; // reurns 0 when all literals are defined
+    decisionsCount++;
+	return lit;
 }
 
 void checkmodel(){
@@ -165,9 +191,9 @@ void checkmodel(){
 
 void print_info() {
 	elapsed_time = double((double(clock()) - elapsed_time) / CLOCKS_PER_SEC);
-    cout << "TIME: " << elapsed_time << endl;
-    cout << "# of DECISIONS: " << decisionsCount << endl;
-    cout << "PROPAGATIONS/SECOND: " << double(propagationsCount)/elapsed_time << endl;
+    cout << "   TIME:\t" << elapsed_time << " s" << endl;
+    cout << "   #DECISIONS:\t" << decisionsCount << " decisions" << endl;
+    //cout << "PROPAGATIONS/SECOND: " << double(propagationsCount)/elapsed_time << endl;
 }
 
 int main() { 
