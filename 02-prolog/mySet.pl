@@ -1,3 +1,5 @@
-intersec(X,Y,I) :- sort(X,XS), sort(Y,YS), auxintersec(XS,YS,I).
+/* Ejercicio 4 */
 
-auxintersec()
+intersec([],_,[]).
+intersec([X|XS],YS,[X|I]) :- member(X,YS), !, intersec(XS,YS,I). /* remove_element(X,YS,YAUX) */
+intersec([_|XS],YS,I):- intersec(XS,YS,I). /* not member no hace falta, porque la anterior tiene corte */
