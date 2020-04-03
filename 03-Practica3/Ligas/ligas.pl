@@ -142,7 +142,7 @@ noTripeticiones:-
     equipo(I1),
     numpartidos(N),
     F is N - 2,
-    between(1,F,J1), % Compruebo que la jornada no sea de las dos ultimas (no segmentation fault)
+    between(1,F,J1), % Compruebo que la jornada no sea de las dos ultimas
     J2 is J1 + 1,
     J3 is J2 + 1,
     findall(partido(I1,I2,J1), (equipo(I2)), Lits1),

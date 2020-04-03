@@ -1,0 +1,8 @@
+file = horarios
+
+$(file): $(file).pl
+	swipl -q -O -g main --stand_alone=true -o $(file) -c $(file).pl
+
+clean:
+	rm -f ligas horarios flow miSudoku model header clauses *.cnf
+
