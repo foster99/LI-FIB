@@ -36,7 +36,7 @@ horesProhibides(5,[2,20,26,27,30,31,44,53,56,58]).
 
 numCursos(4).
 numAssignatures(23).
-%numAssignatures(5).
+% numAssignatures(11).
 numAules(3).
 numProfes(5).
 % ################################################################################################
@@ -56,12 +56,16 @@ year(Y)     :- numCursos(N),        between(1,N,Y).
 dia(D)      :- between(1,5,D).                          % dia
 
 %%%%%%  1. SAT Variables:
-satVariable( cls(C,L,S) ):- course(C), lecture(C,L), slot(S).   % la classe número L de l'assignatura C s'imparte a l'slot S
-satVariable( cr(C,R) ):- course(C), room(R).                    % assignatura C és impartida en l'aula R
-satVariable( ct(C,T) ):- course(C), teacher(T).                 % assignatura C és impartida pel professor T
-satVariable( cs(C,S) ):- course(C), slot(S).                    % asignatura C se imparte en el slot S
-satVariable( emptySlot(Y,S)):- year(Y), slot(S).
-%satVariable( teacher(T,Y,S) ):- year(Y), slot(S), teacher(T).
+satVariable(cls(C,L,S))     :- course(C), lecture(C,L), slot(S).    % la classe número L de l'assignatura C s'imparte a l'slot S
+satVariable(cr(C,R))        :- course(C), room(R).                  % assignatura C és impartida en l'aula R
+satVariable(ct(C,T))        :- course(C), teacher(T).               % assignatura C és impartida pel professor T
+satVariable(cs(C,S))        :- course(C), slot(S).                  % asignatura C se imparte en el slot S
+satVariable(tcs(T,C,S))     :- course(C), slot(S), teacher(T).
+satVariable(rcs(R,C,S))     :- course(C), slot(S), room(R).
+satVariable(emptySlot(Y,S)) :- year(Y), slot(S).
+satVariable(firstHour(Y,S)) :- year(Y), slot(S).
+satVariable(lastHour(Y,S))  :- year(Y), slot(S).
+
 % satVariable( rs(R,S) ):- room(R), slot(S).                      % aula R esta ocupada en el slot S
 
 %%%%%%  2. Clause generation:
@@ -72,12 +76,15 @@ writeClauses:-
     max6AlDia,              % Un curso no puede tener mas de 6 horas de clase al dia.
     noSolapaYear,           % Dado un curso (year) y hora (slot) concretos, se puede o impartir una unica asignatura (course) o nada.
     unaHoraPorDia,          % Maximo una hora de clase por asignatura al dia.
-    % Dadas las asignaturas de un curso, no pueden quedar horas muertas.
+    sinHuecos,              % Dadas las asignaturas de un curso, no pueden quedar horas muertas.
     mismaClaseSala,         % En una aula y hora concretas, solo se puede impartir una clase.
     mismaClaseProfe,        % Una asignatura debe impartirse en la misma aula y por el mismo profesor, y estos deben ser de los validos.
+    unaSalaUnSlot,          % Dada una sala y hora concretos, solo se puede impartir un asignatura
     unProfeUnSlot,          % Dado un profesor y hora concretos, solo se puede impartir una asignatura.
     profesNoProhibidas,     % Profesor no puede dar clases en las horas que no quiere
-    escribeCLS,             % Las lectures de una asignatura, son a diferente hora
+    escribeRCS,
+    escribeTCS,
+    escribeCLS,
     escribeEmpty,
     true,!.
 writeClauses:- told, nl, write('writeClauses failed!'), nl,nl, halt.
@@ -85,7 +92,17 @@ writeClauses:- told, nl, write('writeClauses failed!'), nl,nl, halt.
 myDisplay(0).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+sinHuecos:-
+    year(Y), dia(D),
+    slot(S1), slot(S2), slot(S3), S2 is S1 + 1, S3 is S2 + 1,
+    slot_del_dia(S1,D), slot_del_dia(S2,D), slot_del_dia(S3,D),
+    expressAnd(-emptySlot(Y,S2), [-emptySlot(Y,S1), -emptySlot(Y,S3)]),
+    fail.
+sinHuecos.
+
+
 slot_del_dia(S,D)   :- F is div(S-1,12) + 1, F = D.
+hora(S,H):- H is mod(S-1,12) + 1.
 totalBusy(Y,S):- bagof(N, (A,B,C)^assig(Y,A,N,B,C), Bag), sum_list(Bag, S).
 totalEmpty(Y,S):- totalBusy(Y,SUM), S is 60 - SUM.
 
@@ -126,6 +143,13 @@ unaHoraPorDia:-
     fail.
 unaHoraPorDia.
 
+%
+%
+%
+%
+%
+%
+
 mismaClaseSala:-
     slot(S), room(R),
     findall(rs(R,S), false ,Lits),
@@ -143,9 +167,17 @@ mismaClaseProfe:-
     fail.
 mismaClaseProfe.
 
+unaSalaUnSlot:-
+    slot(S), room(R),
+    findall(rcs(R,C,S), course(C), Lits),
+    atMost(1,Lits),
+    fail.
+unaSalaUnSlot.
+
 unProfeUnSlot:-
-    course(C1), course(C2), dif(C1,C2), slot(S), teacher(T),
-    expressAnd(-ct(C2,T),[cs(C1,S), cs(C2,S), ct(C1,T)]),
+    slot(S), teacher(T),
+    findall(tcs(T,C,S), course(C), Lits),
+    atMost(1,Lits),
     fail.
 unProfeUnSlot.
 
@@ -156,8 +188,17 @@ profesNoProhibidas:-
     fail.
 profesNoProhibidas.
 
-% lecture_libre(C,L):- findall(cls(C,L,S), slot(S), CLS), length(CLS, N), O is 1, N < O.
-% slot_libre(C,S):- findall(cls(C,L,S), lecture(C,L), CS), length(CS, N), O is 1, N < O.
+escribeRCS:-
+    room(R), course(C), slot(S),
+    expressAnd(rcs(R,C,S),[cs(C,S), cr(C,R)]),
+    fail.
+escribeRCS.
+
+escribeTCS:-
+    teacher(T), course(C), slot(S),
+    expressAnd(tcs(T,C,S),[cs(C,S), ct(C,T)]),
+    fail.
+escribeTCS.
 
 escribeCLS:-
     course(C), slot(S),
@@ -374,7 +415,7 @@ var2num(V,N):- hash_term(V,Key), existsOrCreate(V,Key,N),!.
 existsOrCreate(V,Key,N):- varNumber(Key,V,N),!.                            % V already existed with num N
 existsOrCreate(V,Key,N):- newVarNumber(N), assert(varNumber(Key,V,N)), !.  % otherwise, introduce new N for V
 
-writeHeader:- numVars(N),numClauses(C), write('p cnf '),write(N), write(' '),write(C),nl.
+writeHeader:- numVars(N), numClauses(C), write('p cnf '), write(N), write(' '), write(C), nl.
 
 countClause:-     retract( numClauses(N0) ), N is N0+1, assert( numClauses(N) ),!.
 newVarNumber(N):- retract( numVars(   N0) ), N is N0+1, assert(    numVars(N) ),!.
