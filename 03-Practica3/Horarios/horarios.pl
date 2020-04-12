@@ -36,6 +36,7 @@ horesProhibides(5,[2,20,26,27,30,31,44,53,56,58]).
 
 numCursos(4).
 numAssignatures(23).
+%numAssignatures(5).
 numAules(3).
 numProfes(5).
 % ################################################################################################
@@ -54,100 +55,123 @@ slot(S)     :- between(1,60,S).                         % hora
 year(Y)     :- numCursos(N),        between(1,N,Y).
 dia(D)      :- between(1,5,D).                          % dia
 
-
-
 %%%%%%  1. SAT Variables:
 satVariable( cls(C,L,S) ):- course(C), lecture(C,L), slot(S).   % la classe número L de l'assignatura C s'imparte a l'slot S
 satVariable( cr(C,R) ):- course(C), room(R).                    % assignatura C és impartida en l'aula R
 satVariable( ct(C,T) ):- course(C), teacher(T).                 % assignatura C és impartida pel professor T
 satVariable( cs(C,S) ):- course(C), slot(S).                    % asignatura C se imparte en el slot S
+satVariable( emptySlot(Y,S)):- year(Y), slot(S).
+%satVariable( teacher(T,Y,S) ):- year(Y), slot(S), teacher(T).
 % satVariable( rs(R,S) ):- room(R), slot(S).                      % aula R esta ocupada en el slot S
+
 %%%%%%  2. Clause generation:
 
 writeClauses:- 
-    programarLectures,
-    nLectures,
-    consistenciaCS,
+    reservaNSlots,          % Toda asignatura C, hace clase almenos en N slots diferentes.
+    unSlotPorLecture,       % Toda lecture se imparte en un slot.
+    max6AlDia,              % Un curso no puede tener mas de 6 horas de clase al dia.
+    noSolapaYear,           % Dado un curso (year) y hora (slot) concretos, se puede o impartir una unica asignatura (course) o nada.
     unaHoraPorDia,          % Maximo una hora de clase por asignatura al dia.
-    unaClaseUnProfe,        % Una asignatura debe impartirse en la misma aula y por el mismo profesor.
-    unaSalaUnaClase,        % En una aula y hora concretas, solo se puede impartir una clase.
-    noSolapamientos,        % Dado un curso (year) y hora (slot) concretos, solo se puede impartir una asignatura (course).
-    % Dado un profesor y hora concretos, solo se puede impartir una asignatura.
     % Dadas las asignaturas de un curso, no pueden quedar horas muertas.
-    % Un curso no puede tener mas de 6 horas de clase al dia.
-    % Control del numero de asignaturas
+    mismaClaseSala,         % En una aula y hora concretas, solo se puede impartir una clase.
+    mismaClaseProfe,        % Una asignatura debe impartirse en la misma aula y por el mismo profesor, y estos deben ser de los validos.
+    unProfeUnSlot,          % Dado un profesor y hora concretos, solo se puede impartir una asignatura.
+    profesNoProhibidas,     % Profesor no puede dar clases en las horas que no quiere
+    escribeCLS,             % Las lectures de una asignatura, son a diferente hora
+    escribeEmpty,
     true,!.
 writeClauses:- told, nl, write('writeClauses failed!'), nl,nl, halt.
 
-myDisplay(1).
+myDisplay(0).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-cuantas
-slot_del_dia(S,D)   :- F is div(S-1,12) + 1, D == F.
+slot_del_dia(S,D)   :- F is div(S-1,12) + 1, F = D.
+totalBusy(Y,S):- bagof(N, (A,B,C)^assig(Y,A,N,B,C), Bag), sum_list(Bag, S).
+totalEmpty(Y,S):- totalBusy(Y,SUM), S is 60 - SUM.
 
+reservaNSlots:-
+    assig(_,C,N,_,_),
+    findall(cs(C,S), slot(S), Lits),
+    atLeast(N,Lits),
+    fail.
+reservaNSlots.
 
-
-programarLectures:-
+unSlotPorLecture:-
     lecture(C,L),
     findall(cls(C,L,S), slot(S), Lits),
     exactly(1,Lits),
     fail.
-programarLectures.
+unSlotPorLecture.
 
-nLectures:-
-    slot(S),
-    lecture(C,L1),
-    lecture(C,L2),
-    dif(L1,L2),
-    findall(cls(C,L1,S), true, Lits1),
-    findall(cls(C,L2,S), true, Lits2),
-    append(Lits1, Lits2, Lits),
-    exactly(1,Lits),
+max6AlDia:-
+    dia(D),year(Y),
+    findall(emptySlot(Y,S), (slot(S), slot_del_dia(S,D)), Lits),
+    atLeast(6,Lits),
     fail.
-nLectures.
+max6AlDia.
 
-consistenciaCS:-
-    lecture(C,L), slot(S),
-    expressAnd(cs(C,S), [cls(C,L,S)]),
-    fail.
-consistenciaCS.
-
-unaHoraPorDia:-
-    dia(D),
-    course(C),
-    findall( cls(C,S), (slot(S), slot_del_dia(S,H), H = D), Lits),
-    atMost(1,Lits),
-    fail.
-unaHoraPorDia.
-
-unaClaseUnProfe:-
-    assig(_,C,_,A,P),
-    course(C),
-    findall( cr(C,R), (room(R), member(R,A)), Lits1),
-    exactly(1,Lits1),
-    findall( ct(C,T), (teacher(T), member(T,P)), Lits2),
-    exactly(1,Lits2),
-    fail.
-unaClaseUnProfe.
-
-unaSalaUnaClase:-
-    slot(S), room(R),
-    findall(rs(R,S), false ,Lits),
-    atMost(1,Lits),
-    fail.
-unaSalaUnaClase.
-
-noSolapamientos:-
+noSolapaYear:-
     year(Y),
     slot(S),
     findall(cs(C,S), assig(Y,C,_,_,_), Lits),
     atMost(1,Lits),
     fail.
-noSolapamientos.
+noSolapaYear.
 
+unaHoraPorDia:-
+    dia(D),
+    course(C),
+    findall( cs(C,S), (slot(S), slot_del_dia(S,H), H = D), Lits),
+    atMost(1,Lits),
+    fail.
+unaHoraPorDia.
 
+mismaClaseSala:-
+    slot(S), room(R),
+    findall(rs(R,S), false ,Lits),
+    atMost(1,Lits),
+    fail.
+mismaClaseSala.
 
+mismaClaseProfe:-
+    assig(_,C,_,A,P),
+    course(C),
+    findall(cr(C,R), (room(R), member(R,A)), Lits1),
+    exactly(1,Lits1),
+    findall( ct(C,T), (teacher(T), member(T,P)), Lits2),
+    exactly(1,Lits2),
+    fail.
+mismaClaseProfe.
 
+unProfeUnSlot:-
+    course(C1), course(C2), dif(C1,C2), slot(S), teacher(T),
+    expressAnd(-ct(C2,T),[cs(C1,S), cs(C2,S), ct(C1,T)]),
+    fail.
+unProfeUnSlot.
+
+profesNoProhibidas:-
+    horesProhibides(T,SS),
+    findall(cs(C,S), (course(C),slot(S),member(S,SS)), Lits),
+    expressOr(-ct(C,T),Lits),
+    fail.
+profesNoProhibidas.
+
+% lecture_libre(C,L):- findall(cls(C,L,S), slot(S), CLS), length(CLS, N), O is 1, N < O.
+% slot_libre(C,S):- findall(cls(C,L,S), lecture(C,L), CS), length(CS, N), O is 1, N < O.
+
+escribeCLS:-
+    course(C), slot(S),
+    findall(cls(C,L,S), lecture(C,L), Lits),
+    expressOr(cs(C,S), Lits),
+    fail.
+escribeCLS.
+
+escribeEmpty:-
+    slot(S), year(Y),
+    findall(cs(C,S), assig(Y,C,_,_,_), Lits),
+    expressOr(-emptySlot(Y,S), Lits),
+    fail.
+escribeEmpty.
 
 %%%%%%  3. DisplaySol: show the solution. Here M contains the literals that are true in the model:
 extraBlank(N):- 
@@ -247,7 +271,8 @@ displayScheduleYear(Y,M):-
 displaySol(M):-
     myDisplay(1),
     course(C), lecture(C,L), slot(S), room(R), teacher(T),
-    member(cls(C,L,S), M), member(cr(C,R), M), member(ct(C,T), M), member(cs(C,S), M),
+    member(cls(C,L,S), M), member(cr(C,R), M), member(ct(C,T), M),
+    %member(cs(C,S), M),
     write('Assig: '), write(C),
     write('.'), write(L),
     write('\tSlot: '), write(S),
