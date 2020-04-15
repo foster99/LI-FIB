@@ -1,44 +1,3 @@
-% INPUT
-% Sintaxi: assig(curs,assignatura,hores,llistaAules,llistaProfessors).
-assig(1,1,2,[1,2,3],[1,3]).
-assig(1,2,2,[2,3],[5]).
-assig(1,3,4,[2,3],[1,3,4,5]).
-assig(1,4,3,[1],[1,2,4,5]).
-assig(1,5,3,[1,2,3],[1,2,3,4,5]).
-
-assig(2,6,3,[3],[1,3,5]).
-assig(2,7,3,[1,2,3],[3,4,5]).
-assig(2,8,4,[2,3],[3,4]).
-assig(2,9,3,[2],[1,2,3,5]).
-assig(2,10,3,[1,2,3],[4,5]).
-assig(2,11,2,[1,3],[1,3,5]).
-
-assig(3,12,3,[1,3],[1,3,4,5]).
-assig(3,13,4,[1,2],[1,3,5]).
-assig(3,14,2,[1,2,3],[1,2,4,5]).
-assig(3,15,4,[3],[1,2,3]).
-assig(3,16,3,[1,2,3],[2,5]).
-assig(3,17,3,[1,2,3],[1]).
-assig(3,18,3,[1,2,3],[3]).
-
-assig(4,19,4,[1,2,3],[3]).
-assig(4,20,4,[3],[1,3,4,5]).
-assig(4,21,3,[2,3],[2,3]).
-assig(4,22,2,[2,3],[2,3,4,5]).
-assig(4,23,4,[1],[3]).
-
-% Sintaxi: horesProhibides(professor,llistaHores).
-horesProhibides(1,[4,7,12,15,16,18,26,29,30,37,38,45,50,54]).
-horesProhibides(2,[1,5,6,9,11,13,17,20,25,29,30,32,33,37,38,42,44,49,50,55,57]).
-horesProhibides(3,[5,7,8,10,21,22,25,34,38,39,60]).
-horesProhibides(4,[4,9,10,14,17,20,21,22,24,25,27,31,33,38,39,41,42,43,47,55,57]).
-horesProhibides(5,[2,20,26,27,30,31,44,53,56,58]).
-
-numCursos(4).
-numAssignatures(23).
-% numAssignatures(11).
-numAules(3).
-numProfes(5).
 % ################################################################################################
 symbolicOutput(0).  % set to 1 to see symbolic output only; 0 otherwise.
 
@@ -64,7 +23,6 @@ satVariable(tcs(T,C,S))     :- course(C), slot(S), teacher(T).
 satVariable(rcs(R,C,S))     :- course(C), slot(S), room(R).
 satVariable(emptySlot(Y,S)) :- year(Y), slot(S).
 satVariable(firstHour(Y,S)) :- year(Y), slot(S).
-satVariable(lastHour(Y,S))  :- year(Y), slot(S).
 
 % satVariable( rs(R,S) ):- room(R), slot(S).                      % aula R esta ocupada en el slot S
 
@@ -77,6 +35,9 @@ writeClauses:-
     noSolapaYear,           % Dado un curso (year) y hora (slot) concretos, se puede o impartir una unica asignatura (course) o nada.
     unaHoraPorDia,          % Maximo una hora de clase por asignatura al dia.
     sinHuecos,              % Dadas las asignaturas de un curso, no pueden quedar horas muertas.
+    firstHour1,             % Un dia de un year concreto, si la primera hora es lectiva, entonces esa es la primera clase del horario del dia.
+    firstHourAfter,         % Un dia de un year concreto, dados dos slots consecutivos S1 y S2 de un mismo dia, si en S1 no hay clase, pero en
+                            % S2 si la hay, entonces S2 es la primera clase del horario del dia.
     mismaClaseSala,         % En una aula y hora concretas, solo se puede impartir una clase.
     mismaClaseProfe,        % Una asignatura debe impartirse en la misma aula y por el mismo profesor, y estos deben ser de los validos.
     unaSalaUnSlot,          % Dada una sala y hora concretos, solo se puede impartir un asignatura
@@ -91,15 +52,6 @@ writeClauses:- told, nl, write('writeClauses failed!'), nl,nl, halt.
 
 myDisplay(0).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-sinHuecos:-
-    year(Y), dia(D),
-    slot(S1), slot(S2), slot(S3), S2 is S1 + 1, S3 is S2 + 1,
-    slot_del_dia(S1,D), slot_del_dia(S2,D), slot_del_dia(S3,D),
-    expressAnd(-emptySlot(Y,S2), [-emptySlot(Y,S1), -emptySlot(Y,S3)]),
-    fail.
-sinHuecos.
-
 
 slot_del_dia(S,D)   :- F is div(S-1,12) + 1, F = D.
 hora(S,H):- H is mod(S-1,12) + 1.
@@ -143,12 +95,25 @@ unaHoraPorDia:-
     fail.
 unaHoraPorDia.
 
-%
-%
-%
-%
-%
-%
+sinHuecos:-
+    year(Y), dia(D),
+    findall(firstHour(Y,S), (slot(S), slot_del_dia(S,D)), Lits),
+    atMost(1,Lits),
+    fail.
+sinHuecos.
+
+firstHour1:-
+    year(Y), dia(D), slot(S), slot_del_dia(S,D), hora(S,H), H is 1,
+    expressAnd(firstHour(Y,S), [-emptySlot(Y,S)]),
+    fail.
+firstHour1.
+
+firstHourAfter:-
+    year(Y), dia(D), slot(S1), slot(S2), S2 is S1 + 1,
+    slot_del_dia(S1,D), slot_del_dia(S2,D),
+    expressAnd(firstHour(Y,S2),[emptySlot(Y,S1), -emptySlot(Y,S2)]),
+    fail.
+firstHourAfter.
 
 mismaClaseSala:-
     slot(S), room(R),

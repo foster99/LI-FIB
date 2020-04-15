@@ -1,0 +1,438 @@
+numCursos(4).
+numAssignatures(23).
+numAules(3).
+numProfes(5).
+
+% Sintaxi: assig(curs,assignatura,hores,llistaAules,llistaProfessors).
+assig(1,1,3,[3],[2,3,4,5]).
+assig(1,2,2,[2,3],[1,2,3,4,5]).
+assig(1,3,4,[2,3],[1,2,3,4,5]).
+assig(1,4,2,[2,3],[2,3,4,5]).
+assig(1,5,2,[1,2,3],[1,5]).
+
+assig(2,6,3,[1,3],[1,4,5]).
+assig(2,7,4,[1,2,3],[1,2,3,4,5]).
+assig(2,8,2,[1,2,3],[5]).
+assig(2,9,3,[1,2,3],[1,2,5]).
+assig(2,10,4,[1,3],[4,5]).
+
+assig(3,11,2,[1],[3,4]).
+assig(3,12,2,[2],[2,3,4,5]).
+assig(3,13,3,[1,2,3],[1,2,3,5]).
+assig(3,14,2,[1,2,3],[1,2,3,4,5]).
+assig(3,15,2,[1],[2,3,4,5]).
+assig(3,16,3,[1],[1]).
+
+assig(4,17,4,[2,3],[5]).
+assig(4,18,3,[1],[1,2,4,5]).
+assig(4,19,2,[1,2,3],[1,4]).
+assig(4,20,2,[1,2,3],[1,2,3]).
+assig(4,21,3,[1,2,3],[1,3,5]).
+assig(4,22,4,[1],[2,4]).
+assig(4,23,2,[1,2,3],[4]).
+
+% Sintaxi: horesProhibides(professor,llistaHores).
+horesProhibides(1,[1,10,11,12,17,21,24,27,43,49]).
+horesProhibides(2,[4,5,8,9,12,18,19,28,38,46,49,51,53,55,60]).
+horesProhibides(3,[2,3,4,7,8,9,11,16,21,25,26,33,37,40,45,52,53,55,57]).
+horesProhibides(4,[1,2,9,10,20,23,25,26,29,31,32,34,37,40,42,44,45,47,48,49,50,51,52,53,57,58,59]).
+horesProhibides(5,[3,4,8,9,15,24,25,30,32,33,38,39,43,45,46,49,51,52,58]).
+
+% ################################################################################################
+symbolicOutput(0).  % set to 1 to see symbolic output only; 0 otherwise.
+
+/*
+    RESTRICCIONES TEXTUALES
+*/
+
+%%%%%% definitions:
+course(C)   :- numAssignatures(X),  between(1,X,C).     % assignatura
+room(R)     :- numAules(X),         between(1,X,R).     % aula
+lecture(C,L):- assig(_,C,N,_,_),    between(1,N,L).     % sesion (1,2,3,..)
+teacher(T)  :- numProfes(X),        between(1,X,T).     % profesor
+slot(S)     :- between(1,60,S).                         % hora
+year(Y)     :- numCursos(N),        between(1,N,Y).
+dia(D)      :- between(1,5,D).                          % dia
+
+%%%%%%  1. SAT Variables:
+satVariable(cls(C,L,S))     :- course(C), lecture(C,L), slot(S).    % la classe número L de l'assignatura C s'imparte a l'slot S
+satVariable(cr(C,R))        :- course(C), room(R).                  % assignatura C és impartida en l'aula R
+satVariable(ct(C,T))        :- course(C), teacher(T).               % assignatura C és impartida pel professor T
+satVariable(cs(C,S))        :- course(C), slot(S).                  % asignatura C se imparte en el slot S
+satVariable(tcs(T,C,S))     :- course(C), slot(S), teacher(T).
+satVariable(rcs(R,C,S))     :- course(C), slot(S), room(R).
+satVariable(emptySlot(Y,S)) :- year(Y), slot(S).
+satVariable(firstHour(Y,S)) :- year(Y), slot(S).
+
+% satVariable( rs(R,S) ):- room(R), slot(S).                      % aula R esta ocupada en el slot S
+
+%%%%%%  2. Clause generation:
+
+writeClauses:- 
+    reservaNSlots,          % Toda asignatura C, hace clase almenos en N slots diferentes.
+    unSlotPorLecture,       % Toda lecture se imparte en un slot.
+    max6AlDia,              % Un curso no puede tener mas de 6 horas de clase al dia.
+    noSolapaYear,           % Dado un curso (year) y hora (slot) concretos, se puede o impartir una unica asignatura (course) o nada.
+    unaHoraPorDia,          % Maximo una hora de clase por asignatura al dia.
+    sinHuecos,              % Dadas las asignaturas de un curso, no pueden quedar horas muertas.
+    firstHour1,             % Un dia de un year concreto, si la primera hora es lectiva, entonces esa es la primera clase del horario del dia.
+    firstHourAfter,         % Un dia de un year concreto, dados dos slots consecutivos S1 y S2 de un mismo dia, si en S1 no hay clase, pero en
+                            % S2 si la hay, entonces S2 es la primera clase del horario del dia.
+    mismaClaseSala,         % En una aula y hora concretas, solo se puede impartir una clase.
+    mismaClaseProfe,        % Una asignatura debe impartirse en la misma aula y por el mismo profesor, y estos deben ser de los validos.
+    unaSalaUnSlot,          % Dada una sala y hora concretos, solo se puede impartir un asignatura
+    unProfeUnSlot,          % Dado un profesor y hora concretos, solo se puede impartir una asignatura.
+    profesNoProhibidas,     % Profesor no puede dar clases en las horas que no quiere
+    escribeRCS,
+    escribeTCS,
+    escribeCLS,
+    escribeEmpty,
+    true,!.
+writeClauses:- told, nl, write('writeClauses failed!'), nl,nl, halt.
+
+myDisplay(0).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+slot_del_dia(S,D)   :- F is div(S-1,12) + 1, F = D.
+hora(S,H):- H is mod(S-1,12) + 1.
+totalBusy(Y,S):- bagof(N, (A,B,C)^assig(Y,A,N,B,C), Bag), sum_list(Bag, S).
+totalEmpty(Y,S):- totalBusy(Y,SUM), S is 60 - SUM.
+
+reservaNSlots:-
+    assig(_,C,N,_,_),
+    findall(cs(C,S), slot(S), Lits),
+    atLeast(N,Lits),
+    fail.
+reservaNSlots.
+
+unSlotPorLecture:-
+    lecture(C,L),
+    findall(cls(C,L,S), slot(S), Lits),
+    exactly(1,Lits),
+    fail.
+unSlotPorLecture.
+
+max6AlDia:-
+    dia(D),year(Y),
+    findall(emptySlot(Y,S), (slot(S), slot_del_dia(S,D)), Lits),
+    atLeast(6,Lits),
+    fail.
+max6AlDia.
+
+noSolapaYear:-
+    year(Y),
+    slot(S),
+    findall(cs(C,S), assig(Y,C,_,_,_), Lits),
+    atMost(1,Lits),
+    fail.
+noSolapaYear.
+
+unaHoraPorDia:-
+    dia(D),
+    course(C),
+    findall( cs(C,S), (slot(S), slot_del_dia(S,H), H = D), Lits),
+    atMost(1,Lits),
+    fail.
+unaHoraPorDia.
+
+sinHuecos:-
+    year(Y), dia(D),
+    findall(firstHour(Y,S), (slot(S), slot_del_dia(S,D)), Lits),
+    atMost(1,Lits),
+    fail.
+sinHuecos.
+
+firstHour1:-
+    year(Y), dia(D), slot(S), slot_del_dia(S,D), hora(S,H), H is 1,
+    expressAnd(firstHour(Y,S), [-emptySlot(Y,S)]),
+    fail.
+firstHour1.
+
+firstHourAfter:-
+    year(Y), dia(D), slot(S1), slot(S2), S2 is S1 + 1,
+    slot_del_dia(S1,D), slot_del_dia(S2,D),
+    expressAnd(firstHour(Y,S2),[emptySlot(Y,S1), -emptySlot(Y,S2)]),
+    fail.
+firstHourAfter.
+
+mismaClaseSala:-
+    slot(S), room(R),
+    findall(rs(R,S), false ,Lits),
+    atMost(1,Lits),
+    fail.
+mismaClaseSala.
+
+mismaClaseProfe:-
+    assig(_,C,_,A,P),
+    course(C),
+    findall(cr(C,R), (room(R), member(R,A)), Lits1),
+    exactly(1,Lits1),
+    findall( ct(C,T), (teacher(T), member(T,P)), Lits2),
+    exactly(1,Lits2),
+    fail.
+mismaClaseProfe.
+
+unaSalaUnSlot:-
+    slot(S), room(R),
+    findall(rcs(R,C,S), course(C), Lits),
+    atMost(1,Lits),
+    fail.
+unaSalaUnSlot.
+
+unProfeUnSlot:-
+    slot(S), teacher(T),
+    findall(tcs(T,C,S), course(C), Lits),
+    atMost(1,Lits),
+    fail.
+unProfeUnSlot.
+
+profesNoProhibidas:-
+    horesProhibides(T,SS),
+    findall(cs(C,S), (course(C),slot(S),member(S,SS)), Lits),
+    expressOr(-ct(C,T),Lits),
+    fail.
+profesNoProhibidas.
+
+escribeRCS:-
+    room(R), course(C), slot(S),
+    expressAnd(rcs(R,C,S),[cs(C,S), cr(C,R)]),
+    fail.
+escribeRCS.
+
+escribeTCS:-
+    teacher(T), course(C), slot(S),
+    expressAnd(tcs(T,C,S),[cs(C,S), ct(C,T)]),
+    fail.
+escribeTCS.
+
+escribeCLS:-
+    course(C), slot(S),
+    findall(cls(C,L,S), lecture(C,L), Lits),
+    expressOr(cs(C,S), Lits),
+    fail.
+escribeCLS.
+
+escribeEmpty:-
+    slot(S), year(Y),
+    findall(cs(C,S), assig(Y,C,_,_,_), Lits),
+    expressOr(-emptySlot(Y,S), Lits),
+    fail.
+escribeEmpty.
+
+%%%%%%  3. DisplaySol: show the solution. Here M contains the literals that are true in the model:
+extraBlank(N):- 
+    N < 10, !, write(' ').
+extraBlank(_).
+
+drawTail(Y, Hour):-
+    Hour > 48, 
+    write('  Curs: '), write(Y), nl.
+drawTail(_, _).
+
+drawCell(Y, S, M):-
+    member(cls(C,L,S), M),                   %% -------- ADAPTA la SAT variable cls(C,L,S)
+    assig(Y, C, _, _, _), !,
+    write(' '), extraBlank(C), write(C), write(' - '),
+    extraBlank(L), write(L), 
+    write('  ['), member(cr(C,R), M),        %% -------  ADAPTA la SAT variable cr(C,R)
+    write('A:'), extraBlank(R), write(' '), write(R), write(']'),
+    write('  ['), member(ct(C,T), M),        %% -------  ADAPTA la SAT variable ct(C,T)
+    write('P:'), extraBlank(T), write(' '), write(T), write(']'),
+    write(' ').
+drawCell(_, _, _):- 
+    write('                           ').    
+
+drawRow(Row, _):-
+    1 is Row mod 2,
+    H is Row // 2 + 8, 
+    extraBlank(H), 
+    write(' '), write(H), write(':00 '), 
+    between(1, 141, _), write('='), 
+    fail.
+drawRow(Row, _):-
+    1 is Row mod 2, !, nl.
+
+drawRow(Row, M):-
+    year(Y),
+    write('       |'),
+    between(0, 4, Day), 
+    Hour is Row // 2 + Day * 12,
+    drawCell(Y, Hour, M), 
+    write('|'), 
+    drawTail(Y, Hour), 
+    fail.
+drawRow(_, _).
+
+drawHeader:-
+    nl, nl, 
+    write(' Format de sortida: Assignatura - Hora [A: Aula] [P: Professor]'), 
+    nl, nl, 
+    write('                 Dilluns                     Dimarts                     dimecres                     Dijous                    Divendres').
+
+displaySchedule(M):-
+    drawHeader, nl,
+    between(1, 25, Row), 
+    drawRow(Row, M), 
+    fail.
+
+drawHeaderYear(Y):-
+    nl, nl, 
+    write('----------------------------------------------------------------------------------------------------------------------------------------------------'),
+    nl,
+    write(' Horari del curs '), write(Y),
+    nl,
+    write(' Format de sortida: Assignatura - Hora [A: Aula] [P: Professor]'), 
+    nl, nl, 
+    write('                 Dilluns                     Dimarts                     dimecres                     Dijous                    Divendres').
+
+drawTailYear(Hour):-
+    Hour > 48, nl.
+drawTailYear(_, _).
+
+drawRowYear(Row, _, _):-
+    1 is Row mod 2,
+    H is Row // 2 + 8, 
+    extraBlank(H), 
+    write(' '), write(H), write(':00 '), 
+    between(1, 141, _), write('='), 
+    fail.
+drawRowYear(Row, _, _):-
+    1 is Row mod 2, !, nl.
+drawRowYear(Row, Y, M):-
+    write('       |'),
+    between(0, 4, Day), 
+    Hour is Row // 2 + Day * 12,
+    drawCell(Y, Hour, M), 
+    write('|'),
+    drawTailYear(Hour), 
+    fail.
+drawRowYear(_, _, _).
+
+displayScheduleYear(Y,M):-
+    drawHeaderYear(Y), nl,
+    between(1, 25, Row), 
+    drawRowYear(Row, Y, M), 
+    fail.
+
+displaySol(M):-
+    myDisplay(1),
+    course(C), lecture(C,L), slot(S), room(R), teacher(T),
+    member(cls(C,L,S), M), member(cr(C,R), M), member(ct(C,T), M),
+    %member(cs(C,S), M),
+    write('Assig: '), write(C),
+    write('.'), write(L),
+    write('\tSlot: '), write(S),
+    write('\tTeacher: '), write(T),
+    write('\tRoom: '), write(R),
+    nl,
+    fail.
+displaySol(_):- myDisplay(1).
+
+
+displaySol(M):- displaySchedule(M), fail.
+displaySol(M):- year(Y), displayScheduleYear(Y,M), fail.
+displaySol(_).
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Everything below is given as a standard library, reusable for solving 
+%    with SAT many different problems.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Express that Var is equivalent to the disjunction of Lits:
+expressOr( Var, Lits) :- symbolicOutput(1), write( Var ), write(' <--> or('), write(Lits), write(')'), nl, !. 
+expressOr( Var, Lits ):- member(Lit,Lits), negate(Lit,NLit), writeClause([ NLit, Var ]), fail.
+expressOr( Var, Lits ):- negate(Var,NVar), writeClause([ NVar | Lits ]),!.
+
+% Express that Var is equivalent to the conjunction of Lits:
+expressAnd( Var, Lits) :- symbolicOutput(1), write( Var ), write(' <--> and('), write(Lits), write(')'), nl, !. 
+expressAnd( Var, Lits):- member(Lit,Lits), negate(Var,NVar), writeClause([ NVar, Lit ]), fail.
+expressAnd( Var, Lits):- findall(NLit, (member(Lit,Lits), negate(Lit,NLit)), NLits), writeClause([ Var | NLits]), !.
+
+
+%%%%%% Cardinality constraints on arbitrary sets of literals Lits:
+
+exactly(K,Lits):- symbolicOutput(1), write( exactly(K,Lits) ), nl, !.
+exactly(K,Lits):- atLeast(K,Lits), atMost(K,Lits),!.
+
+atMost(K,Lits):- symbolicOutput(1), write( atMost(K,Lits) ), nl, !.
+atMost(K,Lits):-   % l1+...+ln <= k:  in all subsets of size k+1, at least one is false:
+	negateAll(Lits,NLits),
+	K1 is K+1,    subsetOfSize(K1,NLits,Clause), writeClause(Clause),fail.
+atMost(_,_).
+
+atLeast(K,Lits):- symbolicOutput(1), write( atLeast(K,Lits) ), nl, !.
+atLeast(K,Lits):-  % l1+...+ln >= k: in all subsets of size n-k+1, at least one is true:
+	length(Lits,N),
+	K1 is N-K+1,  subsetOfSize(K1, Lits,Clause), writeClause(Clause),fail.
+atLeast(_,_).
+
+negateAll( [], [] ).
+negateAll( [Lit|Lits], [NLit|NLits] ):- negate(Lit,NLit), negateAll( Lits, NLits ),!.
+
+negate( -Var,  Var):-!.
+negate(  Var, -Var):-!.
+
+subsetOfSize(0,_,[]):-!.
+subsetOfSize(N,[X|L],[X|S]):- N1 is N-1, length(L,Leng), Leng>=N1, subsetOfSize(N1,L,S).
+subsetOfSize(N,[_|L],   S ):-            length(L,Leng), Leng>=N,  subsetOfSize( N,L,S).
+
+
+%%%%%% main:
+
+main:-  symbolicOutput(1), !, writeClauses, halt.   % print the clauses in symbolic form and halt
+main:-  initClauseGeneration,
+tell(clauses), writeClauses, told,          % generate the (numeric) SAT clauses and call the solver
+tell(header),  writeHeader,  told,
+numVars(N), numClauses(C),
+write('Generated '), write(C), write(' clauses over '), write(N), write(' variables. '),nl,
+shell('cat header clauses > infile.cnf',_),
+write('Calling solver....'), nl,
+shell('picosat -v -o model infile.cnf', Result),  % if sat: Result=10; if unsat: Result=20.
+	treatResult(Result),!.
+
+treatResult(20):- write('Unsatisfiable'), nl, halt.
+treatResult(10):- write('Solution found: '), nl, see(model), symbolicModel(M), seen, displaySol(M), nl,nl,halt.
+treatResult( _):- write('cnf input error. Wrote anything strange in your cnf?'), nl,nl, halt.
+    
+
+initClauseGeneration:-  %initialize all info about variables and clauses:
+	retractall(numClauses(   _)),
+	retractall(numVars(      _)),
+	retractall(varNumber(_,_,_)),
+	assert(numClauses( 0 )),
+	assert(numVars(    0 )),     !.
+
+writeClause([]):- symbolicOutput(1),!, nl.
+writeClause([]):- countClause, write(0), nl.
+writeClause([Lit|C]):- w(Lit), writeClause(C),!.
+w(-Var):- symbolicOutput(1), satVariable(Var), write(-Var), write(' '),!. 
+w( Var):- symbolicOutput(1), satVariable(Var), write( Var), write(' '),!. 
+w(-Var):- satVariable(Var),  var2num(Var,N),   write(-), write(N), write(' '),!.
+w( Var):- satVariable(Var),  var2num(Var,N),             write(N), write(' '),!.
+w( Lit):- told, write('ERROR: generating clause with undeclared variable in literal '), write(Lit), nl,nl, halt.
+
+
+% given the symbolic variable V, find its variable number N in the SAT solver:
+:-dynamic(varNumber / 3).
+var2num(V,N):- hash_term(V,Key), existsOrCreate(V,Key,N),!.
+existsOrCreate(V,Key,N):- varNumber(Key,V,N),!.                            % V already existed with num N
+existsOrCreate(V,Key,N):- newVarNumber(N), assert(varNumber(Key,V,N)), !.  % otherwise, introduce new N for V
+
+writeHeader:- numVars(N), numClauses(C), write('p cnf '), write(N), write(' '), write(C), nl.
+
+countClause:-     retract( numClauses(N0) ), N is N0+1, assert( numClauses(N) ),!.
+newVarNumber(N):- retract( numVars(   N0) ), N is N0+1, assert(    numVars(N) ),!.
+
+% Getting the symbolic model M from the output file:
+symbolicModel(M):- get_code(Char), readWord(Char,W), symbolicModel(M1), addIfPositiveInt(W,M1,M),!.
+symbolicModel([]).
+addIfPositiveInt(W,L,[Var|L]):- W = [C|_], between(48,57,C), number_codes(N,W), N>0, varNumber(_,Var,N),!.
+addIfPositiveInt(_,L,L).
+readWord( 99,W):- repeat, get_code(Ch), member(Ch,[-1,10]), !, get_code(Ch1), readWord(Ch1,W),!. % skip line starting w/ c
+readWord(115,W):- repeat, get_code(Ch), member(Ch,[-1,10]), !, get_code(Ch1), readWord(Ch1,W),!. % skip line starting w/ s
+readWord(-1,_):-!, fail. %end of file
+readWord(C,[]):- member(C,[10,32]), !. % newline or white space marks end of word
+readWord(Char,[Char|W]):- get_code(Char1), readWord(Char1,W), !.
+%========================================================================================
