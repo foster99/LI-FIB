@@ -44,23 +44,26 @@ notAvailable(g02,[14,34,40,45,48,52,58,65,70,72]).
 notAvailable(g03,[8,11,13,27,30,38,50,51,70]).
 notAvailable(g04,[4,12,16,17,26,30,42,45,48,55,71]).
 
+
 %%%%%%%%%%%%%%%%%%%%% END INPUT. %%%%%%%%%%%%%%%%%%%%%
 
 
 %%%%%% Some helpful definitions to make the code cleaner:
 
-task(T):-        gangstersNeeded(T,_).
-needed(T,H,N):-  gangstersNeeded(T,L), nth1(H,L,N).
-gangster(G):-    gangsters(L), member(G,L).
-hour(H):-        between(1,72,H).
-blocked(G,H):-   notAvailable(G,L), member(H,L).
-available(G,H):- hour(H), gangster(G), \+blocked(G,H).
-
+task(T)             :- gangstersNeeded(T,_).
+needed(T,H,N)       :- gangstersNeeded(T,L), nth1(H,L,N).       % Para la tarea T en la hora H necesito N gangsters.
+gangster(G)         :- gangsters(L), member(G,L).
+hour(H)             :- between(1,72,H).
+blocked(G,H)        :- notAvailable(G,L), member(H,L).
+available(G,H)      :- hour(H), gangster(G), \+blocked(G,H).
+consecutive(H1,H2)  :- hour(H1), hour(H2), H2 is H1 + 1.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 1.- Declare SAT variables to be used
 
-satVariable( does(G,T,H) )  :- gangster(G), task(T), hour(H).   % Gangster G does task T at hour H.
+satVariable( does(G,T,H) )          :- gangster(G), task(T), hour(H).   % Gangster G does task T at hour H.
+satVariable( pair_diff(G,H1,H2) )   :- gangster(G), hour(H1), hour(H2), consecutive(H1,H2).  
+
 
 
 
@@ -70,12 +73,43 @@ satVariable( does(G,T,H) )  :- gangster(G), task(T), hour(H).   % Gangster G doe
 
 writeClauses(infinite):- !, writeClauses(72),!.
 writeClauses(K):-
-    
+
+    allTasksDone,                       %% Todas las tareas tienen los gangsters necesarios, y ninguno de ellos trabaja en horas invalidas.
+    oneGangsterOneHourAtMostOneTask,    %% No gangster can do two different tasks during the same hour.
+    dontChangeTaskOnConsecutiveHours,   %% No gangster can do two different tasks on two consecutive hours.
+    createDiffs,
+    %% Ningun gangster hace K o mas tareas seguidas
 
     true,!.
 writeClauses(_):- told, nl, write('writeClauses failed!'), nl,nl, halt.
 
 
+allTasksDone:-
+    needed(T,H,N),
+    findall( does(G,T,H), (gangster(G), available(G,H)), Lits),
+    exactly(N,Lits),
+    fail.
+allTasksDone.
+
+oneGangsterOneHourAtMostOneTask:-
+    gangster(G), hour(H),
+    findall( does(G,T,H), task(T), Lits),
+    atMost(1,Lits),
+    fail.
+oneGangsterOneHourAtMostOneTask.
+
+dontChangeTaskOnConsecutiveHours:-
+    gangster(G), hour(H1), hour(H2), consecutive(H1,H2),
+    writeClause([-pair_diff(G,H1,H2)]),
+    fail.
+dontChangeTaskOnConsecutiveHours.
+
+createDiffs:-
+    gangster(G), task(T1), task(T2), dif(T1,T2),
+    hour(H1), hour(H2), consecutive(H1,H2),
+    expressAnd(pair_diff(G,H1,H2), [does(G,T1,H1), does(G,T2,H2)]),
+    fail.
+createDiffs.
 
 
 
@@ -107,6 +141,15 @@ writeIfBusy(_,_,_):- write('-'),!.
 % 4. This predicate computes the cost of a given solution M:
 
 costOfThisSolution(M,Cost):- findall(C,member(x(_,C),M),L), sort(L,L1), length(L1,Cost), !.
+
+
+
+
+
+
+
+
+
 
 
 
