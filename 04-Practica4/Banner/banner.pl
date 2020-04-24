@@ -58,7 +58,7 @@ widthBanner(W):-            banner(B), member(L,B), length(L,W),!.
 heightBanner(H):-           banner(B), length(B,H), !.
 contentsCellBanner(X,Y,C):- cell(X,Y), banner(B), heightBanner(H), Y1 is H-Y+1, nth1(Y1,B,L), nth1(X,L,C).
 cell(X,Y):-                 widthBanner(W), heightBanner(H), between(1,W,X), between(1,H,Y).
-
+%% Hay que usar mas definiciones para facilitar la redaccion de las restricciones.
 
 % You can use the following types of symbolic propositional variables:
 %   1. pieceCell(P,X,Y) means:   "piece P fills cell [X,Y]" (note: [1,1] is the bottom-left cell of the banner (Careful: Mandatory variable. Otherwise, displaySol will not work)
@@ -66,6 +66,21 @@ cell(X,Y):-                 widthBanner(W), heightBanner(H), between(1,W,X), bet
 %   3. pieceStarts(P,X,Y) means: "bottom-left cell of piece P is in cell [X,Y]"
 %   4. used(P) means:            "piece P is used"
 
+
+%%%%%%%%%%%%%%%%%
+
+writeClauses(infinite):- !, writeClauses(N),!.
+writeClauses(MaxPieces):-
+    %% cap pesa esta situada en una posicio que fa que surti fora del banner (fa que su X,Y, invalids), hay que contemplar si esta rotada o no
+    %% una pesa nomes (at most) en una posicio
+    %% ...
+    %% una pesa no por estar sobre una altre
+    %% una pesa encaixa dintre dels x del banner (do not fill points)
+    %% ...
+    atMostUsed(K),  %% No se usan mas de K piezas
+
+
+%%%%%%%%%%%%%%%%%
 
 displaySol(M):-
     widthBanner(W),
@@ -81,3 +96,4 @@ displaySol(_):-nl.
 writeCell(M,X,Y):- member(pieceCell-P-X-Y,M), !, write(P).
 writeCell(_,_,_):- write('.').
 
+%% JESUCRISTO HA NACIDO: writeClause([-a,b]) === a => b
