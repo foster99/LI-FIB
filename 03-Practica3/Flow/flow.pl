@@ -62,24 +62,27 @@ color_(C)   :- c(C,_,_,_,_).
 satVariable( color(X,Y,C) )			:- coord(X), coord(Y), color_(C).
 satVariable( start_color(X,Y,C) )	:- coord(X), coord(Y), color_(C).
 satVariable( end_color(X,Y,C) )		:- coord(X), coord(Y), color_(C).
-satVariable( pair(S1,S2,C))			:- slot(S1), slot(S2), color_(C).
-satVariable( linea(S1,S2,C))		:- slot(S1), slot(S2), color_(C).
-% satVariable( lineaH(S1,S2,C))		:- slot(S1), slot(S2), color_(C).
-
+satVariable( pair(S1,S2))			:- slot(S1), slot(S2).
+satVariable( pc(S1,S2,C))			:- slot(S1), slot(S2), color_(C).
+satVariable( connected(S1,S2))      :- slot(S1), slot(S2).
+satVariable( continuous(S1,S2,S3))  :- slot(S1), slot(S2), slot(S3).
 
 %%%%%%  2. Clause generation:
 writeClauses:- 
-    start_end_colors,
-	full,
-	% emparejados,
-	pairColor,
-	justOnePair,
+    start_end_colors,	% Los colores iniciales, son del color que marcan.
+	full,				% Toda celda es de un color
+	emparejados,		% Una celda es pareja izquierda de una sola celda, y es pareja derecha de una sola celda.
+	pairColor,			% Si una celda pertecene a una pareja, y es del color C, entonces la pareja es del color C.
+	adjacent_connection,
+	connected,
 	% linea_horizontal,
 	% linea_vertical,
 	% vecinos,
 	% esquinas,
     true,!.
 writeClauses:- told, nl, write('writeClauses failed!'), nl,nl, halt.
+
+implica(A,B):- writeClause([-A,B]).
 
 adjacent(X,Y1,X,Y2):- cell(X,Y1), cell(X,Y2), Y2 is Y1 + 1, !.
 adjacent(X,Y1,X,Y2):- cell(X,Y1), cell(X,Y2), Y2 is Y1 - 1, !.
@@ -88,27 +91,22 @@ adjacent(X1,Y,X2,Y):- cell(X1,Y), cell(X2,Y), X2 is X1 - 1, !.
 
 start_end_colors:-
 
-	c(C,XS,YS,XE,YE),
+	c(C,XS,YS,XE,YE), cs(XS,YS,Start), cs(XE,YE,End),
 	
 	% Escribir inicio y final
 	writeClause([color(XS,YS,C)]),
 	writeClause([color(XE,YE,C)]),
 
 	% Pair
-	cs(XS,YS,Start), cs(XE,YE,End),
-	writeClause([pair(End,Start,C)]), 
+	writeClause([pair(End,Start)]), 
+	writeClause([pc(End,Start,C)]),
+	writeClause([connected(Start,End)]),
+	writeClause([connected(End,Start)]),
+	% findall(pair(Start,Aux), (cell(X,Y), adjacent(X,Y,XS,YS), cs(X,Y,Aux)), Lits1), exactly(1,Lits1),
+	% findall(pc(Start,Aux,C), (cell(X,Y), adjacent(X,Y,XS,YS), cs(X,Y,Aux)), Lits2), exactly(1,Lits2),
 
-	% findall(color(X,Y,C), cell(X,Y), )
-	
-	% % Start
-	% writeClause([start_color(XS,YS,C)]),
-	% findall(start_color(X,Y,C), (cell(X,Y), dif(X,XS), dif(Y,YS)), LitsStart),
-	% expressOr(-start_color(XS,YS,C),LitsStart),
-
-	% % End
-	% writeClause([end_color(XE,YE,C)]),
-	% findall(start_color(X,Y,C), (cell(X,Y), dif(X,XE), dif(Y,YE)), LitsStart),
-	% expressOr(-end_color(XS,YS,C),LitsStart),
+	% findall(pair(Aux,End), (cell(X,Y), adjacent(X,Y,XE,YE), cs(X,Y,Aux)), Lits3), exactly(1,Lits3),
+	% findall(pc(Aux,End,C), (cell(X,Y), adjacent(X,Y,XE,YE), cs(X,Y,Aux)), Lits4), exactly(1,Lits4),
 
     fail.
 start_end_colors.
@@ -121,99 +119,41 @@ full:-
 full.
 
 emparejados:-
-	slot(S1),slot(S2),slot(S3),color_(C),
-	% findall(linea(S1,S2,C), True, Lits1),
-	% findall(linea(S2,S3,C), True, Lits2),
-	expressAnd(linea(S1,S3,C), [lineaV(S1,S2),linea(S2,S3)]),
-	% findall(pair(S,Aux), slot(Aux), Lits1), exactly(1,Lits1),
-	% findall(pair(Aux,S), slot(Aux), Lits2), exactly(1,Lits2),
+	c(_,_,_,X1,Y1), cs(X1,Y1,End),% La ficha End
+	findall(pair(S2,End), (cell(X2,Y2), adjacent(X1,Y1,X2,Y2), cs(X2,Y2,S2)), Lits1),
+	exactly(1,Lits1),
+	fail.
+emparejados:-
+	cell(X1,Y1), not(c(_,_,_,X1,Y1)), cs(X1,Y1,S1),  % Toda celda a excepcion del end
+	findall(pair(S1,S2), (cell(X2,Y2), adjacent(X1,Y1,X2,Y2), cs(X2,Y2,S2), not(c(_,X2,Y2,_,_))), Lits1),
+	exactly(1,Lits1),
 	fail.
 emparejados.
 
 pairColor:-
 	color_(C), cell(X1,Y1), cell(X2,Y2), adjacent(X1,Y1,X2,Y2), cs(X1,Y1,S1), cs(X2,Y2,S2),
-	expressAnd(pair(S1,S2,C), [color(X1,Y1,C), color(X2,Y2,C)]),
+	% expressAnd(pair(S1,S2), [pair(S2,S1)]),
+	% expressAnd(pc(S1,S2,C), [pc(S2,S1,C)]),
+	expressAnd(pc(S1,S2,C), [pair(S1,S2), color(X1,Y1,C)]),
+	writeClause([-pc(S1,S2,C),color(X2,Y2,C)]),
+	writeClause([-pc(S1,S2,C),color(X1,Y1,C)]),
 	fail.
 pairColor.
 
-justOnePair:-
-	cell(X1,Y1), cell(X2,Y2), adjacent(X1,Y1,X2,Y2), cs(X1,Y1,S1), cs(X2,Y2,S2),
-	findall(pair(S1,S2,C), color_(C), Lits), exactly(1,Lits),
+adjacent_connection:-
+	cell(X1,Y1), cell(X2,Y2), cell(X3,Y3), adjacent(X1,Y1,X2,Y2), adjacent(X2,Y2,X3,Y3), cs(X1,Y1,S1), cs(X2,Y2,S2), cs(X3,Y3,S3),
+	expressAnd( continuous(S1,S2,S3), [pair(S1,S2), pair(S2,S3)]),
+	expressAnd( continuous(S1,S2,S3), [connected(S1,S2), connected(S2,S3)]),
+	% writeClause([-continuous(S1,S2,S3), connected(S1,S3)]),
 	fail.
-justOnePair.
+adjacent_connection.
 
-enlazado:-
-	
+connected:-
+	cell(X1,Y1), cell(X2,Y2), cell(X3,Y3), cs(X1,Y1,S1), cs(X2,Y2,S2), cs(X3,Y3,S3),
+	expressAnd( continuous(S1,S2,S3), [connected(S1,S2), connected(S2,S3)]),
+	writeClause([-continuous(S1,S2,S3), connected(S1,S3)]),
 	fail.
-enlazado.
-
-linea_vertical:-
-	color_(C),
-	cell(X,Y1), cell(X,Y2), Y1 < Y2,
-	cs(X,Y1,S1), cs(X,Y2,S2),
-	findall(color(X,Yaux,C), (coord(Yaux), Y1 < Yaux, Yaux < Y2), Lits1),
-	append([color(X,Y1,C),color(X,Y2,C)], Lits1, Lits),
-	expressAnd(linea(S1,S2,C), Lits),
-	fail.
-linea_vertical.
-
-linea_horizontal:-
-	color_(C),
-	cell(X1,Y), cell(X2,Y), X1 < X2,
-	cs(X1,Y,S1), cs(X2,Y,S2),
-	findall(color(Xaux,Y,C), (coord(Xaux), X1 < Xaux, Xaux < X2), Lits1),
-	append([color(X1,Y,C),color(X2,Y,C)], Lits1, Lits),
-	expressAnd(linea(S1,S2,C), Lits),
-	fail.
-linea_horizontal.
-
-linea:-
-	cell(X1,Y1), cell(X2,Y2), dif(X1,X2), dif(Y1,Y2),
-	
-	fail.
-linea.
-
-vecinos:-
-	c(C,X,Y,_,_),
-	cell(X,U), cell(X,D), cell(L,Y), cell(R,Y),
-	U is Y + 1, D is Y - 1, L is X - 1, R is X + 1,
-	atLeast(1,[color(X,U,C), color(X,D,C), color(L,Y,C), color(R,Y,C)]),
-	fail.
-vecinos:-
-	c(C,_,_,X,Y),
-	cell(X,U), cell(X,D), cell(L,Y), cell(R,Y),
-	U is Y + 1, D is Y - 1, L is X - 1, R is X + 1,
-	atLeast(1,[color(X,U,C), color(X,D,C), color(L,Y,C), color(R,Y,C)]),
-	fail.
-vecinos:-
-	color_(C), color_(C1), color_(C2), color_(C3), color_(C4),
-	dif(C,C1), dif(C,C2), dif(C,C3), dif(C,C4),
-	cell(X,Y),cell(X,U), cell(X,D), cell(L,Y), cell(R,Y),
-	U is Y + 1, D is Y - 1, L is X - 1, R is X + 1,
-	expressAnd(-color(X,Y,C),[color(X,U,C1), color(X,D,C2), color(L,Y,C3), color(R,Y,C4)]),
-	fail.
-vecinos.
-
-
-esquinas:-
-	color_(C), size(N), P is N-1,
-	expressAnd(color(1,1,C),[color(1,2,C), color(2,1,C)]),
-	expressAnd(color(1,N,C),[color(1,P,C), color(2,N,C)]),
-	expressAnd(color(N,1,C),[color(N,2,C), color(P,1,C)]),
-	expressAnd(color(N,N,C),[color(N,P,C), color(P,N,C)]),
-	fail.
-esquinas.
-
-
-
-% amarillito:-
-%     cell(X,Y),
-%     writeClause(color(X,Y,yellow)),
-%     fail.
-% amarillito.
-
-
-
+connected.
 
 
 
@@ -245,6 +185,11 @@ esquinas.
 %%% 3. DisplaySol: show the solution. Here M contains the literals that are true in the model:
 
 displaySol(_):- nl,nl, write('Input:   '), coord(X), nl, coord(Y), writeInputSq(X,Y), fail. 
+
+displaySol(M):- nl,nl, write('Datos:'), slot(S1), slot(S2), cell(X1,Y1), cell(X2,Y2), adjacent(X1,Y1,X2,Y2), cs(X1,Y1,S1), cs(X2,Y2,S2),
+				member(connected(S1,S2),M), member(color(X1,Y1,C1),M), member(color(X2,Y2,C2),M), nl,
+				setColor(white), write('pair('), setColor(C1), write(X1), write(','), write(Y1), write(','), setColor(C2), write(X2), write(','), write(Y2), write(')'), fail. 
+
 displaySol(M):- nl,nl, write('Solution:'), coord(X), nl, coord(Y),
 		member(color(X,Y,Color),M), setColor(Color), write(' o'), fail. 
 displaySol(_):- resetColor, !.
