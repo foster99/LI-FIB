@@ -1,55 +1,39 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%% INPUT 1
-size(9).
-c(blue,  9,1,2,2).
-c(brown, 3,1,8,4).
-c(red,   3,4,1,7).
-c(cyan,  1,8,4,4).
-c(green, 1,9,5,2).
-c(yellow,7,7,7,9).
-c(pink,  6,5,8,7).
-c(violet,8,9,9,6).
-c(orange,5,8,8,8).
+% size(9).
+% c(blue,  9,1,2,2).
+% c(brown, 3,1,8,4).
+% c(red,   3,4,1,7).
+% c(cyan,  1,8,4,4).
+% c(green, 1,9,5,2).
+% c(yellow,7,7,7,9).
+% c(pink,  6,5,8,7).
+% c(violet,8,9,9,6).
+% c(orange,5,8,8,8).
 
 %%% INPUT 2
-% size(14).
-% c( blue,       9,10, 12,11).
-% c( brown,      4,9,  14,10).
-% c( red,        6,4,  7,8  ).
-% c( cyan,       7,3,  7,5  ).
-% c( green,      6,7,  8,8  ).
-% c( yellow,     8,1,  5,11 ).
-% c( pink,       11,3, 12,5 ).
-% c( violet,     5,2,  13,13).
-% c( orange,     11,4, 9,8  ).
-% c( darkblue,   2,2,  2,6  ).
-% c( darkgreen,  10,5, 10,8 ).
-% c( darkred,    14,11,11,14).
-% c( darkcyan,   6,5,  3,12 ).
-% c( white,      9,5,  8,12 ).
-% c( grey,       14,8, 10,10).
+size(14).
+c( blue,       9,10, 12,11).
+c( brown,      4,9,  14,10).
+c( red,        6,4,  7,8  ).
+c( cyan,       7,3,  7,5  ).
+c( green,      6,7,  8,8  ).
+c( yellow,     8,1,  5,11 ).
+c( pink,       11,3, 12,5 ).
+c( violet,     5,2,  13,13).
+c( orange,     11,4, 9,8  ).
+c( darkblue,   2,2,  2,6  ).
+c( darkgreen,  10,5, 10,8 ).
+c( darkred,    14,11,11,14).
+c( darkcyan,   6,5,  3,12 ).
+c( white,      9,5,  8,12 ).
+c( grey,       14,8, 10,10).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 symbolicOutput(0).  % set to 1 to see symbolic output only; 0 otherwise.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 %%%%%% DEFINITIONS
 coord(C)    :- size(N), between(1,N,C).
@@ -64,21 +48,19 @@ satVariable( start_color(X,Y,C) )	:- coord(X), coord(Y), color_(C).
 satVariable( end_color(X,Y,C) )		:- coord(X), coord(Y), color_(C).
 satVariable( pair(S1,S2))			:- slot(S1), slot(S2).
 satVariable( pc(S1,S2,C))			:- slot(S1), slot(S2), color_(C).
-satVariable( connected(S1,S2))      :- slot(S1), slot(S2).
-satVariable( continuous(S1,S2,S3))  :- slot(S1), slot(S2), slot(S3).
+% satVariable( continuous(S1,S2,S3))  :- slot(S1), slot(S2), slot(S3).
 
 %%%%%%  2. Clause generation:
 writeClauses:- 
-    start_end_colors,	% Los colores iniciales, son del color que marcan.
+    start_end_colors,	% Los colores iniciales, son del color que marcan. Una celda inicial no puede ser
+						% sucesora de otra, y una celda final no puede ser predecesora de otra
 	full,				% Toda celda es de un color
-	emparejados,		% Una celda es pareja izquierda de una sola celda, y es pareja derecha de una sola celda.
-	pairColor,			% Si una celda pertecene a una pareja, y es del color C, entonces la pareja es del color C.
-	adjacent_connection,
-	connected,
-	% linea_horizontal,
-	% linea_vertical,
-	% vecinos,
-	% esquinas,
+	pair_predecesores,	% Toda celda solo figura como predecesora una vez (excepto la casilla final)
+	pair_sucesores,		% Toda celda solo figura como sucesora una vez (excepto la casilla inicial)
+	pair_color,			% Si dos celdas S1,S2 son pareja, y S1 es del color C, entonces S2 es del color C.
+	no_simetric_pair,	% La relacion pair no es simetrica, es decir, no puede existir la pareja (S1,S2) y la pareja (S2,S1) a la vez
+
+
     true,!.
 writeClauses:- told, nl, write('writeClauses failed!'), nl,nl, halt.
 
@@ -90,24 +72,14 @@ adjacent(X1,Y,X2,Y):- cell(X1,Y), cell(X2,Y), X2 is X1 + 1, !.
 adjacent(X1,Y,X2,Y):- cell(X1,Y), cell(X2,Y), X2 is X1 - 1, !.
 
 start_end_colors:-
-
 	c(C,XS,YS,XE,YE), cs(XS,YS,Start), cs(XE,YE,End),
-	
-	% Escribir inicio y final
+	% Escribir color de inicio y final
 	writeClause([color(XS,YS,C)]),
 	writeClause([color(XE,YE,C)]),
-
-	% Pair
-	writeClause([pair(End,Start)]), 
-	writeClause([pc(End,Start,C)]),
-	writeClause([connected(Start,End)]),
-	writeClause([connected(End,Start)]),
-	% findall(pair(Start,Aux), (cell(X,Y), adjacent(X,Y,XS,YS), cs(X,Y,Aux)), Lits1), exactly(1,Lits1),
-	% findall(pc(Start,Aux,C), (cell(X,Y), adjacent(X,Y,XS,YS), cs(X,Y,Aux)), Lits2), exactly(1,Lits2),
-
-	% findall(pair(Aux,End), (cell(X,Y), adjacent(X,Y,XE,YE), cs(X,Y,Aux)), Lits3), exactly(1,Lits3),
-	% findall(pc(Aux,End,C), (cell(X,Y), adjacent(X,Y,XE,YE), cs(X,Y,Aux)), Lits4), exactly(1,Lits4),
-
+	% Prohibir sucesores y predecesores invalidos
+	findall(pair(S,Start), (cell(X,Y), cs(X,Y,S)), Lits1), atMost(0,Lits1),
+	findall(pair(End,S), (cell(X,Y), cs(X,Y,S)), Lits2), atMost(0,Lits2),
+	% Tienen que estar conectadas por una linea
     fail.
 start_end_colors.
 
@@ -118,77 +90,43 @@ full:-
 	fail.
 full.
 
-emparejados:-
-	c(_,_,_,X1,Y1), cs(X1,Y1,End),% La ficha End
-	findall(pair(S2,End), (cell(X2,Y2), adjacent(X1,Y1,X2,Y2), cs(X2,Y2,S2)), Lits1),
-	exactly(1,Lits1),
+pair_predecesores:-
+	cell(X1,Y1), not(c(_,_,_,X1,Y1)), cs(X1,Y1,S1),
+	findall(pair(S1,S2), (cell(X2,Y2), adjacent(X1,Y1,X2,Y2), cs(X2,Y2,S2)), Lits1), exactly(1,Lits1),
+	findall(pair(S1,S2), (cell(X2,Y2), not(adjacent(X1,Y1,X2,Y2)), cs(X2,Y2,S2)), Lits2), atMost(0,Lits2),
 	fail.
-emparejados:-
-	cell(X1,Y1), not(c(_,_,_,X1,Y1)), cs(X1,Y1,S1),  % Toda celda a excepcion del end
-	findall(pair(S1,S2), (cell(X2,Y2), adjacent(X1,Y1,X2,Y2), cs(X2,Y2,S2), not(c(_,X2,Y2,_,_))), Lits1),
-	exactly(1,Lits1),
-	fail.
-emparejados.
+pair_predecesores.
 
-pairColor:-
+pair_sucesores:-
+	cell(X1,Y1), not(c(_,X1,Y1,_,_)), cs(X1,Y1,S1),
+	findall(pair(S2,S1), (cell(X2,Y2), adjacent(X1,Y1,X2,Y2), cs(X2,Y2,S2)), Lits1), exactly(1,Lits1),
+	findall(pair(S2,S1), (cell(X2,Y2), not(adjacent(X1,Y1,X2,Y2)), cs(X2,Y2,S2)), Lits2), atMost(0,Lits2),
+	fail.
+pair_sucesores.
+
+pair_color:-
 	color_(C), cell(X1,Y1), cell(X2,Y2), adjacent(X1,Y1,X2,Y2), cs(X1,Y1,S1), cs(X2,Y2,S2),
-	% expressAnd(pair(S1,S2), [pair(S2,S1)]),
-	% expressAnd(pc(S1,S2,C), [pc(S2,S1,C)]),
 	expressAnd(pc(S1,S2,C), [pair(S1,S2), color(X1,Y1,C)]),
-	writeClause([-pc(S1,S2,C),color(X2,Y2,C)]),
-	writeClause([-pc(S1,S2,C),color(X1,Y1,C)]),
+	expressAnd(pc(S1,S2,C), [pair(S1,S2), color(X2,Y2,C)]),
+	writeClause([-pc(S1,S2,C),color(X2,Y2,C)]), %%% pc(S1,S2,C) => color(X2,Y2,C)
+	writeClause([-pc(S1,S2,C),color(X1,Y1,C)]), %%% pc(S1,S2,C) => color(X1,Y1,C)
 	fail.
-pairColor.
+pair_color.
 
-adjacent_connection:-
-	cell(X1,Y1), cell(X2,Y2), cell(X3,Y3), adjacent(X1,Y1,X2,Y2), adjacent(X2,Y2,X3,Y3), cs(X1,Y1,S1), cs(X2,Y2,S2), cs(X3,Y3,S3),
-	expressAnd( continuous(S1,S2,S3), [pair(S1,S2), pair(S2,S3)]),
-	expressAnd( continuous(S1,S2,S3), [connected(S1,S2), connected(S2,S3)]),
-	% writeClause([-continuous(S1,S2,S3), connected(S1,S3)]),
+no_simetric_pair:-
+	cell(X1,Y1), cell(X2,Y2), adjacent(X1,Y1,X2,Y2), cs(X1,Y1,S1), cs(X2,Y2,S2),
+	writeClause([-pair(S1,S2), -pair(S2,S1)]),
 	fail.
-adjacent_connection.
-
-connected:-
-	cell(X1,Y1), cell(X2,Y2), cell(X3,Y3), cs(X1,Y1,S1), cs(X2,Y2,S2), cs(X3,Y3,S3),
-	expressAnd( continuous(S1,S2,S3), [connected(S1,S2), connected(S2,S3)]),
-	writeClause([-continuous(S1,S2,S3), connected(S1,S3)]),
-	fail.
-connected.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+no_simetric_pair.
 
 
 %%% 3. DisplaySol: show the solution. Here M contains the literals that are true in the model:
 
 displaySol(_):- nl,nl, write('Input:   '), coord(X), nl, coord(Y), writeInputSq(X,Y), fail. 
 
-displaySol(M):- nl,nl, write('Datos:'), slot(S1), slot(S2), cell(X1,Y1), cell(X2,Y2), adjacent(X1,Y1,X2,Y2), cs(X1,Y1,S1), cs(X2,Y2,S2),
-				member(connected(S1,S2),M), member(color(X1,Y1,C1),M), member(color(X2,Y2,C2),M), nl,
-				setColor(white), write('pair('), setColor(C1), write(X1), write(','), write(Y1), write(','), setColor(C2), write(X2), write(','), write(Y2), write(')'), fail. 
+% displaySol(M):- nl,nl, write('Datos:'), slot(S1), slot(S2), cell(X1,Y1), cell(X2,Y2), adjacent(X1,Y1,X2,Y2), cs(X1,Y1,S1), cs(X2,Y2,S2),
+% 				member(pair(S1,S2),M), member(color(X1,Y1,C1),M), member(color(X2,Y2,C2),M), nl,
+% 				setColor(white), write('pair('), setColor(C1), write(X1), write(','), write(Y1), write(','), setColor(C2), write(X2), write(','), write(Y2), write(')'), fail. 
 
 displaySol(M):- nl,nl, write('Solution:'), coord(X), nl, coord(Y),
 		member(color(X,Y,Color),M), setColor(Color), write(' o'), fail. 
