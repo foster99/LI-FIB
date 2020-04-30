@@ -57,13 +57,15 @@ hour(H)             :- between(1,72,H).
 blocked(G,H)        :- notAvailable(G,L), member(H,L).
 available(G,H)      :- hour(H), gangster(G), \+blocked(G,H).
 consecutive(H1,H2)  :- hour(H1), hour(H2), H2 is H1 + 1.
+period(K,Hi,Hf)     :- hour(Hi), hour(Hf), Hf is Hi + K - 1.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 1.- Declare SAT variables to be used
 
 satVariable( does(G,T,H) )          :- gangster(G), task(T), hour(H).   % Gangster G does task T at hour H.
+satVariable( work(G,H) )            :- gangster(G), hour(H).            % Gangster G works at hour H.
 satVariable( pair_diff(G,H1,H2) )   :- gangster(G), hour(H1), hour(H2), consecutive(H1,H2).  
-
+satVariable( reachedMax(G,H,Cost) ) :- gangster(G), hour(H), between(1,72,Cost).
 
 
 
@@ -77,9 +79,10 @@ writeClauses(K):-
     allTasksDone,                       %% Todas las tareas tienen los gangsters necesarios, y ninguno de ellos trabaja en horas invalidas.
     oneGangsterOneHourAtMostOneTask,    %% No gangster can do two different tasks during the same hour.
     dontChangeTaskOnConsecutiveHours,   %% No gangster can do two different tasks on two consecutive hours.
-    createDiffs,
-    %% Ningun gangster hace K o mas tareas seguidas
-
+    createDiffs,                        
+    gangsterWorks,                      %% Cuenta que horas trabaja cada gangster
+    countMaxHours,                      %% Cuenta las horas seguidas que hace cada gangster
+    noMax(K),                           %% Ningun gangster hace K o mas tareas seguidas
     true,!.
 writeClauses(_):- told, nl, write('writeClauses failed!'), nl,nl, halt.
 
@@ -111,8 +114,26 @@ createDiffs:-
     fail.
 createDiffs.
 
+gangsterWorks:-
+    gangster(G), hour(H),
+    findall(does(G,T,H), task(T), Lits),
+    expressOr(work(G,H), Lits),
+    fail.
+gangsterWorks.
 
+countMaxHours:-
+    gangster(G), between(1,72,Cost), period(Cost,Hi,Hf),
+    findall(work(G,H),between(Hi,Hf,H), Lits),
+    expressAnd(reachedMax(G,Hi,Cost),Lits),
+    fail.
+countMaxHours.
 
+noMax(K):-
+    between(K,72,Cost),
+    findall(reachedMax(G,H,Cost), (gangster(G), hour(H)), Lits),
+    atMost(0,Lits),
+    fail.
+noMax(_).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -140,7 +161,7 @@ writeIfBusy(_,_,_):- write('-'),!.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 4. This predicate computes the cost of a given solution M:
 
-costOfThisSolution(M,Cost):- findall(C,member(x(_,C),M),L), sort(L,L1), length(L1,Cost), !.
+costOfThisSolution(M,Cost):- findall(K,member(reachedMax(_,_,K),M),L), max_list(L,Cost), !.
 
 
 
