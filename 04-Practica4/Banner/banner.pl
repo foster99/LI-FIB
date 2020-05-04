@@ -66,7 +66,6 @@ invalidY(Y,H):-             heightBanner(HB), Y+H-1 > HB.
 %% Hay que usar mas definiciones para facilitar la redaccion de las restricciones.
 
 satVariable( pieceStarts(P,X,Y) )   :- piece(P), cell(X,Y).                 % la pieza P tiene su esquina inferior izquierda en la posicion (X,Y)
-satVariable( pieceStartR(P,X,Y,R) ) :- piece(P), cell(X,Y), between(0,1,R). % la pieza P tiene su esquina inferior izquierda en la posicion (X,Y) y esta rotada si R =1
 satVariable( rotated(P) )           :- piece(P).                            % la pieza P esta rotada
 satVariable( pieceCell(P,X,Y) )     :- piece(P), cell(X,Y).                 % la pieza P ocupa la celda (X,Y)
 satVariable( used(P) )              :- piece(P).                            % la pieza P esta en uso
@@ -81,74 +80,51 @@ writeClauses(MaxPieces):-
     onlyOnePos,             %% una pieza solo puede estar en una posicion
     onlyBannerCells,        %% en toda celda sin banner no hay pieza y en toda pieza con banner solo puede haber parte de 1 pieza
     pieceSpace,             %% Si una pieza P esta en la posicion (X,Y), entonses ocupa espasio xd
-    rotatedAndLocated,      %% Escribe la relacion entre estar colocada y rotada
+    % rotatedAndLocated,      %% Escribe la relacion entre estar colocada y rotada
     onlyIfUsed,             %% Si una pieza esta colocada en algun sitio, esta esta en uso
     atMostUsed(MaxPieces),  %% No se usan mas de K piezas
     true, !.
 writeClauses(_):- told, nl, write('writeClauses failed!'), nl,nl, halt.
 %%%%%%%%%%%%%%%%%
 
-noExceedLimits:- piece(P), cell(X,Y), pieceSize(P,W,_), invalidX(X,W), writeClause([-pieceStartR(P,X,Y,0)]), fail.
-noExceedLimits:- piece(P), cell(X,Y), pieceSize(P,_,H), invalidX(X,H), writeClause([-pieceStartR(P,X,Y,1)]), fail.
-noExceedLimits:- piece(P), cell(X,Y), pieceSize(P,_,H), invalidY(Y,H), writeClause([-pieceStartR(P,X,Y,0)]), fail.
-noExceedLimits:- piece(P), cell(X,Y), pieceSize(P,W,_), invalidY(Y,W), writeClause([-pieceStartR(P,X,Y,1)]), fail.
+noExceedLimits:- piece(P), cell(X,Y), pieceSize(P,W,_), invalidX(X,W), writeClause([ rotated(P), -pieceStarts(P,X,Y)]), fail.
+noExceedLimits:- piece(P), cell(X,Y), pieceSize(P,_,H), invalidX(X,H), writeClause([-rotated(P), -pieceStarts(P,X,Y)]), fail.
+noExceedLimits:- piece(P), cell(X,Y), pieceSize(P,_,H), invalidY(Y,H), writeClause([ rotated(P), -pieceStarts(P,X,Y)]), fail.
+noExceedLimits:- piece(P), cell(X,Y), pieceSize(P,W,_), invalidY(Y,W), writeClause([-rotated(P), -pieceStarts(P,X,Y)]), fail.
 noExceedLimits.
 
 onlyBannerCells:- cell(X,Y), contentsCellBanner(X,Y,x), findall(pieceCell(P,X,Y), piece(P), Lits), exactly(1,Lits), fail.
 onlyBannerCells:- cell(X,Y), contentsCellBanner(X,Y,.), findall(pieceCell(P,X,Y), piece(P), Lits),  atMost(0,Lits), fail.
 onlyBannerCells.
 
-%%% VERSION 1
-% pieceSpace:-
-%     piece(P), cell(Xstart,Ystart), pieceSize(P,W,H), Xend is Xstart + W - 1, Yend is Ystart + H - 1,
-%     findall( pieceCell(P,X,Y), (cell(X,Y),     between(Xstart,Xend,X),      between(Ystart,Yend,Y) ), Lits1),
-%     findall(-pieceCell(P,X,Y), (cell(X,Y), not(between(Xstart,Xend,X)), not(between(Ystart,Yend,Y))), Lits2),
-%     append(Lits1, Lits2, Lits),
-%     expressAnd(pieceStartR(P,Xstart,Ystart,0), Lits),
-%     fail.
-% pieceSpace:-
-%     piece(P), cell(Xstart,Ystart), pieceSize(P,H,W), Xend is Xstart + W - 1, Yend is Ystart + H - 1,
-%     findall( pieceCell(P,X,Y), (cell(X,Y),     between(Xstart,Xend,X),      between(Ystart,Yend,Y) ), Lits1),
-%     findall(-pieceCell(P,X,Y), (cell(X,Y), not(between(Xstart,Xend,X)), not(between(Ystart,Yend,Y))), Lits2),
-%     append(Lits1, Lits2, Lits),
-%     expressAnd(pieceStartR(P,Xstart,Ystart,1), Lits),
-%     fail.
-% pieceSpace.
-
-%%% VERSION 2
 pieceSpace:- % Pieza no rotada, celda incluida
     piece(P), cell(Xstart,Ystart), pieceSize(P,W,H), Xend is Xstart + W - 1, Yend is Ystart + H - 1,
     cell(X,Y), between(Xstart,Xend,X), between(Ystart,Yend,Y),
-    writeClause([-pieceStartR(P,Xstart,Ystart,0), pieceCell(P,X,Y)]),
+    writeClause([rotated(P), -pieceStarts(P,Xstart,Ystart), pieceCell(P,X,Y)]),
     fail.
 pieceSpace:- % Pieza no rotada, celda no incluida
     piece(P), cell(Xstart,Ystart), pieceSize(P,W,H), Xend is Xstart + W - 1, Yend is Ystart + H - 1,
     cell(X,Y), not(between(Xstart,Xend,X)), not(between(Ystart,Yend,Y)),
-    writeClause([-pieceStartR(P,Xstart,Ystart,0), -pieceCell(P,X,Y)]),
+    writeClause([rotated(P), -pieceStarts(P,Xstart,Ystart), -pieceCell(P,X,Y)]),
     fail.
 pieceSpace:- % Pieza rotada, celda incluida
     piece(P), cell(Xstart,Ystart), pieceSize(P,H,W), Xend is Xstart + W - 1, Yend is Ystart + H - 1,
     cell(X,Y), between(Xstart,Xend,X), between(Ystart,Yend,Y),
-    writeClause([-pieceStartR(P,Xstart,Ystart,1), pieceCell(P,X,Y)]),
+    writeClause([-rotated(P), -pieceStarts(P,Xstart,Ystart), pieceCell(P,X,Y)]),
     fail.
 pieceSpace:- % Pieza rotada, celda no incluida
     piece(P), cell(Xstart,Ystart), pieceSize(P,H,W), Xend is Xstart + W - 1, Yend is Ystart + H - 1,
     cell(X,Y), not(between(Xstart,Xend,X)), not(between(Ystart,Yend,Y)),
-    writeClause([-pieceStartR(P,Xstart,Ystart,1), -pieceCell(P,X,Y)]),
+    writeClause([-rotated(P), -pieceStarts(P,Xstart,Ystart), -pieceCell(P,X,Y)]),
     fail.
 pieceSpace.
 
-
-
 onlyOnePos:- 
-    piece(P), %pieceSize(P,W,H), Area is W*H,
+    piece(P), % pieceSize(P,W,H), Area is W*H,
     findall(pieceStarts(P,X,Y), cell(X,Y), Lits1), atMost(1,Lits1),
     % findall(pieceCell(P,X,Y), cell(X,Y), Lits2), atMost(Area,Lits2),
     fail.
 onlyOnePos.
-
-% onlyOnePiece:- cell(X,Y), findall(pieceCell(P,X,Y), piece(P), Lits), atMost(1,Lits), fail.
-% onlyOnePiece.
 
 onlyIfUsed:-
     piece(P),
@@ -156,13 +132,6 @@ onlyIfUsed:-
     findall(pieceStarts(P,X,Y), cell(X,Y), Lits2), expressOr(used(P), Lits2),
     fail.
 onlyIfUsed.
-
-rotatedAndLocated:-
-    piece(P), cell(X,Y),
-    expressAnd(pieceStartR(P,X,Y,1), [ rotated(P), pieceStarts(P,X,Y)]),
-    expressAnd(pieceStartR(P,X,Y,0), [-rotated(P), pieceStarts(P,X,Y)]),
-    fail.
-rotatedAndLocated.
 
 useThePiece:- piece(P), cell(X,Y), writeClause([-pieceStarts(P,X,Y), used(P)]), fail.
 useThePiece.
@@ -176,14 +145,18 @@ atMostUsed(MaxPieces):- findall(used(P), piece(P), Lits), atMost(MaxPieces, Lits
 costOfThisSolution(M,Cost):- findall(P, member(used(P),M),L), length(L,Cost), !.
 
 %%%%%%%%%%%%%%%%%
-displaySol(M):-
-    cell(X,Y), piece(P),between(0,1,R),
-    member(pieceStartR(P,X,Y,R),M), write('StartR: ('), write(X), write(','), write(Y), write(') -> R('), write(R), write(') '), write(P), nl,
-    fail.
 % displaySol(M):-
-%     cell(X,Y), piece(P),
-%     member(pieceStarts(P,X,Y),M), write('Start: ('), write(X), write(','), write(Y), write(') '), write(P), nl,
+%     cell(X,Y), piece(P),between(0,1,R),
+%     member(pieceStartR(P,X,Y,R),M), write('StartR: ('), write(X), write(','), write(Y), write(') -> R('), write(R), write(') '), write(P), nl,
 %     fail.
+displaySol(M):-
+    cell(X,Y), piece(P),
+    member(pieceStarts(P,X,Y),M), member(rotated(P),M), write('Start: ('), write(X), write(','), write(Y), write(') '), write(P), write(' R'), nl,
+    fail.
+displaySol(M):-
+    cell(X,Y), piece(P),
+    member(pieceStarts(P,X,Y),M), not(member(rotated(P),M)), write('Start: ('), write(X), write(','), write(Y), write(') '), write(P), nl,
+    fail.
 displaySol(M):-
     cell(X,Y), piece(P),
     member(pieceCell(P,X,Y), M), write('pc: ('), write(X), write(','), write(Y), write(') -> '), write(P), nl,
