@@ -2,7 +2,7 @@
 % shortest route in order to visit all 22 (or the first N) cities starting from
 % city 1 (it does not matter in what city the trip ends).
 
-main:- N=11, retractall(bestRouteSoFar(_,_)),  assertz(bestRouteSoFar(100000,[])),  % "infinite" distance
+main:- N=15, retractall(bestRouteSoFar(_,_)),  assertz(bestRouteSoFar(100000,[])),  % "infinite" distance
        findall(I,between(2,N,I),Cities), tsp( Cities, 0, [1] ).
 main:- bestRouteSoFar(Km,ReverseRoute), reverse( ReverseRoute, Route ), nl,
        write('Optimal route: '), write(Route), write('. '), write(Km), write(' km.'), nl, nl, halt.

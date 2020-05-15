@@ -24,12 +24,13 @@ storeRouteIfBetter( Km, Route ):-  bestRouteSoFar( BestKm, _ ), Km < BestKm,
     write('Improved solution. New best distance is '), write(Km), write(' km.'),nl,
     retractall(bestRouteSoFar(_,_)), assertz(bestRouteSoFar(Km,Route)),!.
 
-main:- N=5, retractall(bestRouteSoFar(_,_)),  assertz(bestRouteSoFar(100000,[])),  % "infinite" distance
+main:- N=10, retractall(bestRouteSoFar(_,_)),  assertz(bestRouteSoFar(100000,[])),  % "infinite" distance
        example( N, Passengers ),
        helicopterBasePoint( CurrentPoint ),
        heli( Passengers, 0, [CurrentPoint], [] ).
 main:- bestRouteSoFar(Km,ReverseRoute), reverse( ReverseRoute, Route ), nl,
        write('Optimal route: '), write(Route), write('. '), write(Km), write(' km.'), nl, nl, halt.
+
 
 % heli( PassengersToPickUp, AccumulatedDistance, RouteSoFar, DestinationsOfPassengersInHelicopter )
 
@@ -37,10 +38,26 @@ main:- bestRouteSoFar(Km,ReverseRoute), reverse( ReverseRoute, Route ), nl,
 heli( _, AccumulatedDistance, _, _ ):- bestRouteSoFar(Distance,_),  AccumulatedDistance >= Distance, !, fail.
 
 % No passengers to pick up, no passengers left in helicopter -->  return to base
-heli( [], AccumulatedDistance, [CurrentPoint|RouteSoFar], [] ):- ...
+heli( [], AccumulatedDistance, [CurrentPoint|RouteSoFar], [] ):-
+    helicopterBasePoint(Base),
+    distanceBetweenTwoPoints(CurrentPoint, Base, DistToBase),
+    TotalDist is AccumulatedDistance + DistToBase,
+    storeRouteIfBetter(TotalDist,[Base,CurrentPoint|RouteSoFar]),
+    fail.
 
 % Pick up another passenger:
-heli( PassengersToPickUp, AccumulatedDistance, [CurrentPoint|RouteSoFar], DestinationsOfPassengersInHelicopter ):- ...
-
+heli( PassengersToPickUp, AccumulatedDistance, [CurrentPoint|RouteSoFar], DestinationsOfPassengersInHelicopter ):-
+    length(DestinationsOfPassengersInHelicopter, CurrentPassengers), CurrentPassengers < 2, % Puedo subir a un pasajero, si hay menos de 2.
+    select([Origin, Dest], PassengersToPickUp, PassengersToPickUp_next),
+    distanceBetweenTwoPoints(CurrentPoint,Origin,DistToPassenger),          % Desde donde estoy, tengo que ir a buscarlo, y sumar esa distancia a mi acumulador.
+    AccumulatedDistance_next is AccumulatedDistance + DistToPassenger,
+    heli(PassengersToPickUp_next, AccumulatedDistance_next, [Origin,CurrentPoint|RouteSoFar], [Dest|DestinationsOfPassengersInHelicopter]).
+    
+    
 % Drop off one of the passengers in the helicopter:
-heli( PassengersToPickUp, AccumulatedDistance, [CurrentPoint|RouteSoFar], DestinationsOfPassengersInHelicopter ):- ...
+heli( PassengersToPickUp, AccumulatedDistance, [CurrentPoint|RouteSoFar], DestinationsOfPassengersInHelicopter ):-
+    length(DestinationsOfPassengersInHelicopter, CurrentPassengers), CurrentPassengers > 0, % Puedo dejar a un pasajero, si hay al menos 1.
+    select(Dest, DestinationsOfPassengersInHelicopter, DestinationsOfPassengersInHelicopter_next),
+    distanceBetweenTwoPoints(CurrentPoint,Dest,DistToDest),          % Desde donde estoy, tengo que ir al destino que quiere, y sumar esa distancia.
+    AccumulatedDistance_next is AccumulatedDistance + DistToDest,
+    heli(PassengersToPickUp, AccumulatedDistance_next, [Dest,CurrentPoint|RouteSoFar], DestinationsOfPassengersInHelicopter_next).
