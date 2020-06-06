@@ -38,10 +38,10 @@ writeClauses:-
     eachTeamEachRoundOneMatch,
     eachOpponentExactlyOnce,
     homesAndAways,
-    noDoubles,                 % to be done
-    atmostOneTVMatchPerRound,  % to be done
-    sixOrSevenHomes,           % to be done
-    atMostOneDouble,           % to be done
+    noDoubles,                 % done
+    atmostOneTVMatchPerRound,  % done
+    sixOrSevenHomes,           % done
+    atMostOneDouble,           % done
     true.
 writeClauses:- told, nl, write('writeClauses failed!'), nl,nl, halt.
 
@@ -69,22 +69,36 @@ homesAndAways.
 
 
 noDoubles:- 
-    ...
+    team(T), round(Rprev), R is Rprev + 1, round(R), noDoubles(ND),
+    writeClause([-home(T,R),-home(T,Rprev),double(T,R)]),   % casa
+    writeClause([home(T,R),home(T,Rprev), double(T,R)]),    % fuera
+    findall(double(T,RND), (member(RND,ND), round(RND)), Lits), 
+    atMost(0,Lits),
     fail.
 noDoubles.
 
-atmostOneTVMatchPerRound:- 
-    ...
+
+atmostOneTVMatchPerRound:-
+    round(R),
+    findall(match(T1,T2,R), tvMatch(T1-T2), Lits),
+    atMost(1,Lits),
     fail.
+
 atmostOneTVMatchPerRound.
 
+
 sixOrSevenHomes:-  
-    ...
+    team(T),
+    findall(home(T,R), round(R), Lits), 
+    atLeast(6,Lits), atMost(7,Lits),
     fail.
 sixOrSevenHomes.
 
+
 atMostOneDouble:-  
-    ...
+    team(T),
+    findall(double(T,R), round(R), Lits), 
+    atMost(1,Lits),
     fail.
 atMostOneDouble.
 
